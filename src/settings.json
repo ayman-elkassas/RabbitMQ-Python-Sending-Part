@@ -1,0 +1,24 @@
+{
+  "oracle_db_configuration":{
+    "username": "WORKFLOW",
+    "password": "WORKFLOW",
+    "service_name" : "isd11",
+    "hostname" : "192.134.101.70",
+    "tcp_port_num" : 1521,
+    "triggers_on": [
+      "insert",
+      "update",
+      "delete"
+    ],
+    "table_on_change_sql_function": {
+      "DOCS_TO": "NOTIFICATION_DOCS_TO",
+      "DOCS_FROM": "NOTIFICATION_DOCS_FROM"
+    }
+  },
+
+  "rabbitmq_configuration": {
+    "username": "admin",
+    "password": "admin123",
+    "hostname" : "192.134.101.85"
+  }
+}
