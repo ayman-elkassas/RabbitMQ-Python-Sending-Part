@@ -1,0 +1,1 @@
+C:\Users\workflow\AppData\Local\Continuum\miniconda3\python.exe "C:\Users\workflow\Desktop\Notification Messaging\database_push_notification\src\db_pushnotif.py" "-c" "C:\Users\workflow\Desktop\Notification Messaging\database_push_notification\src\settings.json"

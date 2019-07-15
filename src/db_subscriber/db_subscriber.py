@@ -41,7 +41,11 @@ class DBSubscriber(object):
         self.__json_dir = json_config_dir
         self.__json_conf = None
         self.__db = None
-        self.__sender = None
+        self.__sender = RabbitmqSender(
+            hostname="192.134.101.85",
+            username="admin",
+            password="admin123"
+        )
         self.__subs = dict()
 
     def __read_json_config(self, json_file_dir):
@@ -155,16 +159,17 @@ class DBSubscriber(object):
             self.__subs[t].registerquery('select * from {}'.format(t))
             Logger.log.info("Subscribed to table: '{}' successfully".format(t))
 
-    def __connect_rabbitmq(self):
-        username = self.__get_rabbitmq_config("username")
-        hostname = self.__get_rabbitmq_config("hostname")
-        password = self.__get_rabbitmq_config("password")
-        self.__sender = RabbitmqSender(
-            hostname=hostname,
-            username=username,
-            password=password
-        )
-        self.__sender.connect()
+    #TODO:COMMENT
+    # def __connect_rabbitmq(self):
+    #     username = self.__get_rabbitmq_config("username")
+    #     hostname = self.__get_rabbitmq_config("hostname")
+    #     password = self.__get_rabbitmq_config("password")
+    #     self.__sender = RabbitmqSender(
+    #         hostname=hostname,
+    #         username=username,
+    #         password=password
+    #     )
+    #     self.__sender.connect()
 
     def __send_sql_cur(self, cur):
         """
@@ -174,25 +179,32 @@ class DBSubscriber(object):
         description = None
         try:
             description = cur.description
+
+            idx = {str(i[0]): j for j, i in enumerate(cur.description)}
+            data = [i for i in cur][0]
+            msg = Message(
+                msg=data[idx["MESSAGE"]],
+                m_type=data[idx["TYPE"]],
+                url=data[idx["URL"]],
+                reminder_date=data[idx["REMINDER_DATE"]],
+                reminder_msg=data[idx["REMINDER_MESSAGE"]]
+            )
+
+            #TODO:Check nullable
+            q_name = data[idx["NID"]]
+            if (q_name != None or msg != None):
+                self.__sender.send_msg(q_name, msg)
+
         except Exception as _:
             Logger.log.warning("Empty sql response returned. Ignoring sending")
             return
-        idx = {str(i[0]): j for j, i in enumerate(cur.description)}
-        data = [i for i in cur][0]
-        msg = Message(
-            msg=data[idx["MESSAGE"]],
-            m_type=data[idx["TYPE"]],
-            url=data[idx["URL"]],
-            reminder_date=data[idx["REMINDER_DATE"]],
-            reminder_msg=data[idx["REMINDER_MESSAGE"]]
-        )
-        q_name = data[idx["NID"]]
-        self.__sender.send_msg(q_name, msg)
+
 
     def subscribe(self):
         self.__read_json_config(self.__json_dir)
         self.__oracle_db_connect()
-        self.__connect_rabbitmq()
+        #TODO:Comment connection
+        #self.__connect_rabbitmq()
 
         tables = self.__get_oracle_db_config("table_on_change_sql_function")
         self.__subscribe_to_tables(tables_name=tables.keys())

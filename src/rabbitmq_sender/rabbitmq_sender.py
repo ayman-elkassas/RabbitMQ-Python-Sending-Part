@@ -47,6 +47,12 @@ class RabbitmqSender(object):
         :param msg: message object
         :type msg: message.message.Message
         """
+
+
+        #TODO:edit open new connection every sending
+
+        self.connect()
+
         Logger.log.info("Sending message to queue: '{}'".format(queue_name))
         msg_body = json.dumps(msg.__dict__)
         self.__channel.queue_declare(queue=queue_name,
@@ -56,4 +62,5 @@ class RabbitmqSender(object):
         self.__channel.basic_publish(exchange='',
                                      routing_key=queue_name,
                                      body=msg_body)
+
         Logger.log.info("Message sent to queue: '{}' successfully".format(queue_name))
