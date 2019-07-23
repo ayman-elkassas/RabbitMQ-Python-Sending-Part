@@ -128,21 +128,30 @@ class DBSubscriber(object):
         return methods_dict[abs_t_name]
 
     def __db_change_callback(self, msg):
-        cur = self.__db.cursor()
-        for tab in msg.tables:
-            try:
-                _m_name = self._m_name(tab.name)
-            except Exception as e:
-                Logger.log.error("Table: '{}' has no sql function defined at the json file. "
-                                 "Ignoring this table change. Exception details are printed below.")
-                Logger.log.exception(e)
-                continue
-            rows = tab.rows
-            if rows[0].operation == cx_Oracle.OPCODE_UPDATE and len(rows) > 1:
-                rows = rows[1:]
-            for row in rows:
-                sql_ret = _parse_changed_row(_m_name, row, cur)
-                self.__send_sql_cur(sql_ret)
+
+        start = 0
+        if cx_Oracle.OPCODE_UPDATE == 4:
+            start=1
+
+        for index in range(start, len(msg.tables[0].rows)):
+            cur = self.__db.cursor()
+            for tab in msg.tables:
+                try:
+                    _m_name = self._m_name(tab.name)
+                except Exception as e:
+                    Logger.log.error("Table: '{}' has no sql function defined at the json file. "
+                                     "Ignoring this table change. Exception details are printed below.")
+                    Logger.log.exception(e)
+                    continue
+                rows = tab.rows
+                if rows[0].operation == cx_Oracle.OPCODE_UPDATE and len(rows) > 1:
+                    rows = rows[1:]
+                for row in rows:
+                    sql_ret = _parse_changed_row(_m_name, row, cur)
+                    self.__send_sql_cur(sql_ret)
+
+
+
 
     def __subscribe_to_tables(self, tables_name):
         """
@@ -179,25 +188,27 @@ class DBSubscriber(object):
         description = None
         try:
             description = cur.description
+            data = [i for i in cur]
+            for row in data :
 
-            idx = {str(i[0]): j for j, i in enumerate(cur.description)}
-            data = [i for i in cur][0]
-            msg = Message(
-                msg=data[idx["MESSAGE"]],
-                m_type=data[idx["TYPE"]],
-                url=data[idx["URL"]],
-                reminder_date=data[idx["REMINDER_DATE"]],
-                reminder_msg=data[idx["REMINDER_MESSAGE"]]
-            )
-
-            #TODO:Check nullable
-            q_name = data[idx["NID"]]
-            if (q_name != None or msg != None):
-                self.__sender.send_msg(q_name, msg)
+                idx = {str(i[0]): j for j, i in enumerate(cur.description)}
+                msg = Message(
+                    msg=row[idx["MESSAGE"]],
+                    m_type=row[idx["TYPE"]],
+                    url=row[idx["URL"]],
+                    reminder_date=row[idx["REMINDER_DATE"]],
+                    reminder_msg=row[idx["REMINDER_MESSAGE"]]
+                )
+                # TODO:Check nullable
+                q_name = str(row[idx["NID"]])
+                if (q_name != None or msg != None):
+                    self.__sender.send_msg(q_name, msg)
 
         except Exception as _:
             Logger.log.warning("Empty sql response returned. Ignoring sending")
             return
+
+
 
 
     def subscribe(self):
