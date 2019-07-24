@@ -42,18 +42,19 @@ class DBSubscriber(object):
     once a change happens
     :param json_config_dir: The json directory containing all the required db info
     """
+    _sender = RabbitmqSender(
+        hostname="192.134.101.85",
+        username="admin",
+        password="admin123"
+    )
 
-    reminderThread="";
+    reminderThread=threading.Thread()
 
     def __init__(self, json_config_dir):
         self.__json_dir = json_config_dir
         self.__json_conf = None
         self.__db = None
-        self.__sender = RabbitmqSender(
-            hostname="192.134.101.85",
-            username="admin",
-            password="admin123"
-        )
+
         self.__subs = dict()
 
     def __read_json_config(self, json_file_dir):
@@ -212,13 +213,21 @@ class DBSubscriber(object):
                 # TODO:Check nullable
                 q_name = str(row[idx["NID"]])
                 if (q_name != None or msg != None):
-                    self.__sender.send_msg(q_name, msg)
+                    DBSubscriber._sender.send_msg(q_name, msg)
+
+                    #todo:prepare date
+                    reminder_date=str(msg.REMINDER_DATE).split("-")
 
                     #Todo
                     # :make reminder as regiser
                     reminder=Reminder()
-                    self.reminderThread = threading.Thread(target=reminder.reminderAt, args=(12, 10,10))
-                    self.reminderThread.start()
+                    DBSubscriber.reminderThread = threading.Thread(target=reminder.reminderAt,
+                                                           args=(int(reminder_date[0]),
+                                                                 int(reminder_date[1]),
+                                                                 int(reminder_date[2]),
+                                                                 q_name,msg))
+
+                    DBSubscriber.reminderThread.start()
 
 
         except Exception as _:

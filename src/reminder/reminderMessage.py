@@ -5,6 +5,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from datetime import datetime, timedelta
 
+from db_subscriber.db_subscriber import DBSubscriber
 
 class Reminder:
 
@@ -14,14 +15,15 @@ class Reminder:
         self.date=""
         self.scheduler = BackgroundScheduler()
 
-    def tick(self,text):
-        print(text + '! The time is: %s' % datetime.now())
+    def tick(self,q_name,msg):
+        # print(text)
+        DBSubscriber._sender.send_msg(q_name, msg)
 
-    def reminderAt(self,year,month,day):
+    def reminderAt(self,year,month,day,q_name,msg):
 
         dd = datetime(year,month,day) + timedelta(hours=10,minutes=0,seconds=0)
-        print(dd)
-        self.scheduler.add_job(self.tick, 'date', run_date=dd, args=['TICK'])
+        # print(dd)
+        self.scheduler.add_job(self.tick, 'date', run_date=dd, args=[q_name,msg])
         self.scheduler.start()
 
         # print('Press Ctrl+{0} to exit'.format('Break' if os.name == 'nt' else 'C'))
@@ -35,8 +37,9 @@ class Reminder:
         except (KeyboardInterrupt, SystemExit):
             # Not strictly necessary if daemonic mode is enabled but should be done if possible
             self.scheduler.shutdown()
+            DBSubscriber.reminderThread.join()
 
 
 
 # reminder=Reminder();
-# reminder.reminderAt()
+# reminder.reminderAt(2019,7,24)
