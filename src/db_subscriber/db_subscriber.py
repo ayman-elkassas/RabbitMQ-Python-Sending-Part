@@ -200,7 +200,7 @@ class DBSubscriber(object):
             for row in data :
 
                 idx = {str(i[0]): j for j, i in enumerate(cur.description)}
-                
+
                 msg = Message(
                     msg=row[idx["MESSAGE"]],
                     m_type=row[idx["TYPE"]],
