@@ -12,6 +12,12 @@ from utils.utils import DBNotificationException
 from rabbitmq_sender.rabbitmq_sender import RabbitmqSender
 from message.message import Message
 
+#TODO:Threading
+import threading
+
+#TODO:Reminder
+from reminder.reminderMessage import Reminder
+
 
 def _parse_changed_row(method_name, r, cur):
     try:
@@ -36,6 +42,8 @@ class DBSubscriber(object):
     once a change happens
     :param json_config_dir: The json directory containing all the required db info
     """
+
+    reminderThread="";
 
     def __init__(self, json_config_dir):
         self.__json_dir = json_config_dir
@@ -192,6 +200,7 @@ class DBSubscriber(object):
             for row in data :
 
                 idx = {str(i[0]): j for j, i in enumerate(cur.description)}
+                
                 msg = Message(
                     msg=row[idx["MESSAGE"]],
                     m_type=row[idx["TYPE"]],
@@ -199,10 +208,18 @@ class DBSubscriber(object):
                     reminder_date=row[idx["REMINDER_DATE"]],
                     reminder_msg=row[idx["REMINDER_MESSAGE"]]
                 )
+
                 # TODO:Check nullable
                 q_name = str(row[idx["NID"]])
                 if (q_name != None or msg != None):
                     self.__sender.send_msg(q_name, msg)
+
+                    #Todo
+                    # :make reminder as regiser
+                    reminder=Reminder()
+                    self.reminderThread = threading.Thread(target=reminder.reminderAt, args=(12, 10,10))
+                    self.reminderThread.start()
+
 
         except Exception as _:
             Logger.log.warning("Empty sql response returned. Ignoring sending")
