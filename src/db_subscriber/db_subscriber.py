@@ -18,7 +18,6 @@ import threading
 #TODO:Reminder
 from reminder.reminderMessage import Reminder
 
-
 def _parse_changed_row(method_name, r, cur):
     try:
         row_id = r.rowid
@@ -42,18 +41,18 @@ class DBSubscriber(object):
     once a change happens
     :param json_config_dir: The json directory containing all the required db info
     """
-    _sender = RabbitmqSender(
+    sender = RabbitmqSender(
         hostname="192.134.101.85",
         username="admin",
         password="admin123"
     )
 
-    reminderThread=threading.Thread()
+    # reminderThread=threading.Thread()
 
     def __init__(self, json_config_dir):
-        self.__json_dir = json_config_dir
-        self.__json_conf = None
-        self.__db = None
+        self.json_dir = json_config_dir
+        self.json_conf = None
+        self.db = None
 
         self.__subs = dict()
 
@@ -65,7 +64,7 @@ class DBSubscriber(object):
         actual_dir = os.path.abspath(json_file_dir)
         Logger.log.info("Reading the json configuration from : '{}'".format(actual_dir))
         with open(actual_dir, 'r') as f:
-            self.__json_conf = json.load(f)
+            self.json_conf = json.load(f)
         Logger.log.info("configuration loaded successfully")
 
     def __get_oracle_db_config(self, config_name):
@@ -76,7 +75,7 @@ class DBSubscriber(object):
         :return: the json item value
         """
         try:
-            return self.__json_conf["oracle_db_configuration"][config_name]
+            return self.json_conf["oracle_db_configuration"][config_name]
         except Exception as _:
             raise DBNotificationException("JSON file missing "
                                           "'oracle_db_configuration':'{}'".format(config_name))
@@ -89,7 +88,7 @@ class DBSubscriber(object):
         :return: the json item value
         """
         try:
-            return self.__json_conf["rabbitmq_configuration"][config_name]
+            return self.json_conf["rabbitmq_configuration"][config_name]
         except Exception as _:
             raise DBNotificationException("JSON file missing "
                                           "'rabbitmq_configuration':'{}'".format(config_name))
@@ -110,7 +109,7 @@ class DBSubscriber(object):
                                 service_name=ora_service_name)
         Logger.log.info("dsn created successfully")
         Logger.log.info("Connecting to oracle db with the given credentials")
-        self.__db = cx_Oracle.connect(user=ora_username,
+        self.db = cx_Oracle.connect(user=ora_username,
                                       password=ora_password,
                                       dsn=dsn,
                                       events=True)
@@ -136,14 +135,14 @@ class DBSubscriber(object):
         methods_dict = self.__get_oracle_db_config("table_on_change_sql_function")
         return methods_dict[abs_t_name]
 
-    def __db_change_callback(self, msg):
+    def db_change_callback(self, msg):
 
         start = 0
         if cx_Oracle.OPCODE_UPDATE == 4:
             start=1
 
         for index in range(start, len(msg.tables[0].rows)):
-            cur = self.__db.cursor()
+            cur = self.db.cursor()
             for tab in msg.tables:
                 try:
                     _m_name = self._m_name(tab.name)
@@ -157,7 +156,7 @@ class DBSubscriber(object):
                     rows = rows[1:]
                 for row in rows:
                     sql_ret = _parse_changed_row(_m_name, row, cur)
-                    self.__send_sql_cur(sql_ret)
+                    self.send_sql_cur(sql_ret)
 
 
 
@@ -170,8 +169,8 @@ class DBSubscriber(object):
         Logger.log.info("Running tables subscription ")
         triggers_on = self.__get_triggers_on()
         for t in tables_name:
-            self.__subs[t] = self.__db.subscribe(
-                callback=self.__db_change_callback,
+            self.__subs[t] = self.db.subscribe(
+                callback=self.db_change_callback,
                 operations=triggers_on,
                 qos=cx_Oracle.SUBSCR_QOS_ROWIDS)
             self.__subs[t].registerquery('select * from {}'.format(t))
@@ -189,7 +188,7 @@ class DBSubscriber(object):
     #     )
     #     self.__sender.connect()
 
-    def __send_sql_cur(self, cur):
+    def send_sql_cur(self, cur):
         """
         sends the returned sql ref_cursor
         :param cur: sql function ref_cursor object result
@@ -213,21 +212,21 @@ class DBSubscriber(object):
                 # TODO:Check nullable
                 q_name = str(row[idx["NID"]])
                 if (q_name != None or msg != None):
-                    DBSubscriber._sender.send_msg(q_name, msg)
+                    DBSubscriber.sender.send_msg(q_name, msg)
 
-                    #todo:prepare date
-                    reminder_date=str(msg.REMINDER_DATE).split("-")
-
-                    #Todo
-                    # :make reminder as regiser
-                    reminder=Reminder()
-                    DBSubscriber.reminderThread = threading.Thread(target=reminder.reminderAt,
-                                                           args=(int(reminder_date[0]),
-                                                                 int(reminder_date[1]),
-                                                                 int(reminder_date[2]),
-                                                                 q_name,msg))
-
-                    DBSubscriber.reminderThread.start()
+                    # #todo:prepare date
+                    # reminder_date=str(msg.REMINDER_DATE).split("-")
+                    #
+                    # #Todo
+                    # # :make reminder as regiser
+                    # reminder=Reminder()
+                    # DBSubscriber.reminderThread = threading.Thread(target=reminder.reminderAt,
+                    #                                        args=(int(reminder_date[2]),
+                    #                                              int(reminder_date[1]),
+                    #                                              int(reminder_date[0]),
+                    #                                              q_name,msg))
+                    #
+                    # DBSubscriber.reminderThread.start()
 
 
         except Exception as _:
@@ -238,10 +237,14 @@ class DBSubscriber(object):
 
 
     def subscribe(self):
-        self.__read_json_config(self.__json_dir)
+        self.__read_json_config(self.json_dir)
         self.__oracle_db_connect()
         #TODO:Comment connection
         #self.__connect_rabbitmq()
 
         tables = self.__get_oracle_db_config("table_on_change_sql_function")
         self.__subscribe_to_tables(tables_name=tables.keys())
+
+    def subscribeReminer(self):
+        self.__read_json_config(self.json_dir)
+        self.__oracle_db_connect()
